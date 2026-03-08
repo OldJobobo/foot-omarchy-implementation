@@ -1,0 +1,45 @@
+#!/bin/bash
+
+if ! command -v tte &>/dev/null; then exit 1; fi
+pgrep -f org.omarchy.screensaver && exit 0
+if [[ -f ~/.local/state/omarchy/toggles/screensaver-off ]] && [[ $1 != "force" ]]; then exit 1; fi
+
+walker -q
+focused=$(hyprctl monitors -j | jq -r '.[] | select(.focused == true).name')
+terminal=$(xdg-terminal-exec --print-id)
+
+for m in $(hyprctl monitors -j | jq -r '.[] | .name'); do
+  hyprctl dispatch focusmonitor "$m"
+  case $terminal in
+    *Alacritty*)
+      hyprctl dispatch exec -- \
+        alacritty --class=org.omarchy.screensaver \
+        --config-file ~/.local/share/omarchy/default/alacritty/screensaver.toml \
+        -e omarchy-cmd-screensaver
+      ;;
+    *ghostty*)
+      hyprctl dispatch exec -- \
+        ghostty --class=org.omarchy.screensaver \
+        --config-file=~/.local/share/omarchy/default/ghostty/screensaver \
+        --font-size=18 \
+        -e omarchy-cmd-screensaver
+      ;;
+    *kitty*)
+      hyprctl dispatch exec -- \
+        kitty --class=org.omarchy.screensaver \
+        --override font_size=18 \
+        --override window_padding_width=0 \
+        -e omarchy-cmd-screensaver
+      ;;
+    *foot*)
+      hyprctl dispatch exec -- \
+        footclient -F -a org.omarchy.screensaver \
+        omarchy-cmd-screensaver
+      ;;
+    *)
+      notify-send "✋  Screensaver runs in Alacritty, Ghostty, Kitty, or Foot"
+      ;;
+  esac
+done
+
+hyprctl dispatch focusmonitor "$focused"
