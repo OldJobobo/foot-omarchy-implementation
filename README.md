@@ -26,13 +26,32 @@ If you want Omarchy to feel like it was built around Foot, this repo covers the 
 
 Think of `implementation/` as the file map behind the guide.
 
-| Repo path | Target path | Purpose |
-| --- | --- | --- |
-| [`implementation/.config/xdg-terminals.list`](implementation/.config/xdg-terminals.list) | `~/.config/xdg-terminals.list` | Makes `xdg-terminal-exec` prefer Foot. |
-| [`implementation/.config/foot/foot.ini`](implementation/.config/foot/foot.ini) | `~/.config/foot/foot.ini` | Base Foot config that includes Omarchy-generated theme colors. |
-| [`implementation/.config/omarchy/themed/foot.ini.tpl`](implementation/.config/omarchy/themed/foot.ini.tpl) | `~/.config/omarchy/themed/foot.ini.tpl` | Omarchy template used to render the active Foot palette. |
-| [`implementation/.config/omarchy/hooks/theme-set.d/26-foot-live-colors.sh`](implementation/.config/omarchy/hooks/theme-set.d/26-foot-live-colors.sh) | `~/.config/omarchy/hooks/theme-set.d/26-foot-live-colors.sh` | Optional live recolor hook for already-open Foot terminals. |
-| [`implementation/.local/bin/omarchy-launch-screensaver`](implementation/.local/bin/omarchy-launch-screensaver) | `~/.local/bin/omarchy-launch-screensaver` | Screensaver launcher override with Foot support. |
+```text
+implementation/
+├── .config/
+│   ├── foot/foot.ini
+│   ├── omarchy/
+│   │   ├── hooks/theme-set.d/26-foot-live-colors.sh
+│   │   └── themed/foot.ini.tpl
+│   └── xdg-terminals.list
+└── .local/bin/omarchy-launch-screensaver
+```
+
+- [`implementation/.config/xdg-terminals.list`](implementation/.config/xdg-terminals.list)
+  Target: `~/.config/xdg-terminals.list`
+  Makes `xdg-terminal-exec` prefer Foot.
+- [`implementation/.config/foot/foot.ini`](implementation/.config/foot/foot.ini)
+  Target: `~/.config/foot/foot.ini`
+  Base Foot config that includes Omarchy-generated theme colors.
+- [`implementation/.config/omarchy/themed/foot.ini.tpl`](implementation/.config/omarchy/themed/foot.ini.tpl)
+  Target: `~/.config/omarchy/themed/foot.ini.tpl`
+  Omarchy template used to render the active Foot palette.
+- [`implementation/.config/omarchy/hooks/theme-set.d/26-foot-live-colors.sh`](implementation/.config/omarchy/hooks/theme-set.d/26-foot-live-colors.sh)
+  Target: `~/.config/omarchy/hooks/theme-set.d/26-foot-live-colors.sh`
+  Optional live recolor hook for already-open Foot terminals.
+- [`implementation/.local/bin/omarchy-launch-screensaver`](implementation/.local/bin/omarchy-launch-screensaver)
+  Target: `~/.local/bin/omarchy-launch-screensaver`
+  Screensaver launcher override with Foot support.
 
 ## Recommended Flow
 
