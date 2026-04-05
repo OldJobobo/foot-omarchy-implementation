@@ -4,7 +4,6 @@ Use `foot` as your Omarchy terminal without losing Omarchy's theme flow, termina
 
 This repository packages the full Foot-first Omarchy setup as:
 
-- a user-facing setup guide
 - a set of mirrored config files you can inspect or copy into place
 - a reference implementation for optional live recolor and `footclient` support
 
