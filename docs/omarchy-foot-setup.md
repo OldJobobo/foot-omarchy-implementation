@@ -1,21 +1,18 @@
-## Use `footclient` as Omarchy default terminal (TUI + screensaver)
+## Use `foot` as Omarchy default terminal (TUI + screensaver)
 
 ### 1) Install `foot`
 ```bash
 omarchy-pkg-install foot || yay -S foot
 ```
 
-Start the Foot server (first-time setup):
-```bash
-systemctl --user enable --now foot-server
-```
+Foot server is optional; see section 9 for the `footclient` alternative.
 
 ### 2) Set default terminal for `xdg-terminal-exec`
 ```bash
 cat > ~/.config/xdg-terminals.list <<'EOF'
 # Terminal emulator preference order for xdg-terminal-exec
 # The first found and valid terminal will be used
-footclient.desktop
+foot.desktop
 EOF
 ```
 
@@ -25,7 +22,7 @@ Create the Foot template used by Omarchy theme rendering:
 ```bash
 mkdir -p ~/.config/omarchy/themed
 cat > ~/.config/omarchy/themed/foot.ini.tpl <<'EOF'
-[colors]
+[colors-dark]
 background={{ background_strip }}
 foreground={{ foreground_strip }}
 cursor={{ background_strip }} {{ cursor_strip }}
@@ -64,7 +61,7 @@ include=~/.config/omarchy/current/theme/foot.ini
 font=Hack Nerd Font:size=13.5
 pad=14x14
 
-[colors]
+[colors-dark]
 # alpha=1.0
 
 [cursor]
@@ -123,7 +120,7 @@ for m in $(hyprctl monitors -j | jq -r '.[] | .name'); do
       ;;
     *foot*)
       hyprctl dispatch exec -- \
-        footclient -F -a org.omarchy.screensaver \
+        foot -F -a org.omarchy.screensaver \
         omarchy-cmd-screensaver
       ;;
     *)
@@ -148,7 +145,7 @@ xdg-terminal-exec --print-id
 
 Expected:
 ```text
-footclient.desktop
+foot.desktop
 ```
 
 Test screensaver immediately (no waiting):
@@ -220,8 +217,10 @@ If you use Omarchy Theme-Hook style `theme-set.d` hooklettes, add this hook:
 
 What it does:
 - Runs during `omarchy-theme-set`.
-- Sends OSC color updates to active Foot terminals (no Foot restart required).
+- Sends OSC color updates to discovered Foot-backed PTYs (no Foot restart required).
 - Reads colors from Omarchy-exported hook vars, with fallback to `~/.config/omarchy/current/theme/foot.ini`.
+- Does not filter by Hyprland workspace. If a window appears to lag behind, that is more likely a redraw/visibility issue than workspace-specific targeting.
+- Uses `OSC 11` with `rgb:` for the background color. Foot background transparency remains controlled by `alpha` and `alpha-mode` in `foot.ini`, not by the live OSC payload.
 
 Enable:
 ```bash
@@ -238,3 +237,36 @@ Disable quickly (without removing script):
 ```bash
 FOOT_LIVE_THEME=0 omarchy-theme-set "$(omarchy-theme-current)"
 ```
+
+### 9) Alternative setup: `foot --server` + `footclient` (optional)
+Use this if you want a daemon-backed terminal model:
+
+```bash
+systemctl --user enable --now foot-server
+cat > ~/.config/xdg-terminals.list <<'EOF'
+# Terminal emulator preference order for xdg-terminal-exec
+# The first found and valid terminal will be used
+footclient.desktop
+EOF
+```
+
+If using this mode, switch the Foot branch in your `~/.local/bin/omarchy-launch-screensaver` to:
+
+```bash
+    *foot*)
+      hyprctl dispatch exec -- \
+        footclient -F -a org.omarchy.screensaver \
+        omarchy-cmd-screensaver
+      ;;
+```
+
+Why this is not ideal for Omarchy if you switch themes often:
+- `omarchy-theme-set` regenerates `~/.config/omarchy/current/theme/foot.ini`.
+- `omarchy-restart-terminal` does not restart `foot --server`.
+- New `footclient` windows can keep old colors until the server is restarted.
+- The live-color hook can update discovered windows, but it does not make the server re-read `foot.ini`.
+
+Possible reasons to still use server mode:
+- Faster new terminal startup.
+- Lower per-window overhead.
+- Consistent daemon-backed behavior for heavy multi-window terminal workflows.

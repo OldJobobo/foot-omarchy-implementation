@@ -1,4 +1,4 @@
-[colors]
+[colors-dark]
 background={{ background_strip }}
 foreground={{ foreground_strip }}
 cursor={{ background_strip }} {{ cursor_strip }}

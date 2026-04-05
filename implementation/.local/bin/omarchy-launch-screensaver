@@ -33,7 +33,7 @@ for m in $(hyprctl monitors -j | jq -r '.[] | .name'); do
       ;;
     *foot*)
       hyprctl dispatch exec -- \
-        footclient -F -a org.omarchy.screensaver \
+        foot -F -a org.omarchy.screensaver \
         omarchy-cmd-screensaver
       ;;
     *)

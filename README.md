@@ -1,6 +1,6 @@
 # Foot + Omarchy Implementation Bundle
 
-This repository contains copied documentation and implementation files for the Foot/Footclient Omarchy setup.
+This repository contains copied documentation and implementation files for a Foot-first Omarchy setup, with optional Foot server/client mode.
 
 ## Included files
 
@@ -17,7 +17,3 @@ This repository contains copied documentation and implementation files for the F
 - `implementation/.local/bin/omarchy-launch-screensaver`
   - Source: `~/.local/bin/omarchy-launch-screensaver`
 
-## Notes
-
-- Files were copied, not moved.
-- Originals remain in place on your system.

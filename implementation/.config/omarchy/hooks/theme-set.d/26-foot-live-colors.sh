@@ -3,6 +3,8 @@ set -u
 
 LOG_FILE="/tmp/foot-theme-hook.log"
 FOOT_THEME_FILE="$HOME/.config/omarchy/current/theme/foot.ini"
+FOOT_BASE_CONFIG="$HOME/.config/foot/foot.ini"
+OMARCHY_COLORS_FILE="$HOME/.config/omarchy/current/theme/colors.toml"
 ENABLED="${FOOT_LIVE_THEME:-1}"
 
 log() {
@@ -20,12 +22,84 @@ normalize_hex() {
   return 1
 }
 
+normalize_alpha() {
+  local value="${1:-}"
+  value="${value//[[:space:]]/}"
+  value="${value,,}"
+  if [[ "$value" =~ ^(0(\.[0-9]+)?|1(\.0+)?)$ ]]; then
+    printf '%s' "$value"
+    return 0
+  fi
+  return 1
+}
+
+alpha_to_hex() {
+  local value
+  if ! value="$(normalize_alpha "${1:-}" 2>/dev/null)"; then
+    return 1
+  fi
+
+  awk -v alpha="$value" 'BEGIN {
+    channel = int((alpha * 255) + 0.5)
+    if (channel < 0) channel = 0
+    if (channel > 255) channel = 255
+    printf "%02x", channel
+  }'
+}
+
+format_rgb_spec() {
+  local value
+  if ! value="$(normalize_hex "${1:-}" 2>/dev/null)"; then
+    return 1
+  fi
+
+  printf 'rgb:%s/%s/%s' "${value:0:2}" "${value:2:2}" "${value:4:2}"
+}
+
+format_rgba_spec() {
+  local rgb_value alpha_hex
+  if ! rgb_value="$(normalize_hex "${1:-}" 2>/dev/null)"; then
+    return 1
+  fi
+  if ! alpha_hex="$(normalize_hex "${2:-}" 2>/dev/null)"; then
+    return 1
+  fi
+
+  printf 'rgba:%s/%s/%s/%s' "${rgb_value:0:2}" "${rgb_value:2:2}" "${rgb_value:4:2}" "${alpha_hex:0:2}"
+}
+
+parse_omarchy_color() {
+  local key="$1"
+  local file_path="${2:-$OMARCHY_COLORS_FILE}"
+  awk -F= -v wanted="$key" '
+    $1 ~ /^[[:space:]]*#/ {
+      next
+    }
+    {
+      k = $1
+      gsub(/[[:space:]]/, "", k)
+      if (k == wanted && match($0, /#([0-9A-Fa-f]{6})/)) {
+        print substr($0, RSTART + 1, 6)
+        exit
+      }
+    }
+  ' "$file_path" 2>/dev/null
+}
+
 parse_foot_color() {
   local key="$1"
+  local file_path="${2:-$FOOT_THEME_FILE}"
   awk -F= -v wanted="$key" '
-    BEGIN { in_colors = 0 }
+    BEGIN { in_colors = 0; seen_dark = 0 }
     /^[[:space:]]*\[/ {
-      in_colors = ($0 ~ /^[[:space:]]*\[colors\][[:space:]]*$/)
+      if ($0 ~ /^[[:space:]]*\[colors-dark\][[:space:]]*$/) {
+        in_colors = 1
+        seen_dark = 1
+      } else if ($0 ~ /^[[:space:]]*\[colors\][[:space:]]*$/ && !seen_dark) {
+        in_colors = 1
+      } else {
+        in_colors = 0
+      }
       next
     }
     in_colors {
@@ -39,7 +113,7 @@ parse_foot_color() {
         exit
       }
     }
-  ' "$FOOT_THEME_FILE" 2>/dev/null
+  ' "$file_path" 2>/dev/null
 }
 
 read_cursor_fallback() {
@@ -50,9 +124,19 @@ read_cursor_fallback() {
   normalize_hex "$raw" || true
 }
 
+read_alpha_fallback() {
+  local raw
+  raw="$(parse_foot_color "alpha" "$FOOT_BASE_CONFIG")"
+  if ! raw="$(normalize_alpha "$raw" 2>/dev/null)"; then
+    raw="$(parse_foot_color "alpha" "$FOOT_THEME_FILE")"
+  fi
+  normalize_alpha "$raw" || true
+}
+
 load_color() {
   local var_name="$1"
-  local fallback_key="$2"
+  local colors_key="$2"
+  local foot_key="${3:-$colors_key}"
   local current="${!var_name:-}"
 
   if current="$(normalize_hex "$current" 2>/dev/null)"; then
@@ -61,7 +145,10 @@ load_color() {
   fi
 
   local parsed
-  parsed="$(parse_foot_color "$fallback_key")"
+  parsed="$(parse_omarchy_color "$colors_key")"
+  if ! parsed="$(normalize_hex "$parsed" 2>/dev/null)"; then
+    parsed="$(parse_foot_color "$foot_key")"
+  fi
   parsed="${parsed#\#}"
   parsed="${parsed%% *}"
   if parsed="$(normalize_hex "$parsed" 2>/dev/null)"; then
@@ -129,6 +216,20 @@ fi
 if ! cursor_color="$(normalize_hex "${cursor_color:-}" 2>/dev/null)"; then
   cursor_color="$primary_foreground"
 fi
+if ! load_color selection_background "selection_background" "selection-background"; then
+  selection_background="$primary_foreground"
+fi
+if ! load_color selection_foreground "selection_foreground" "selection-foreground"; then
+  selection_foreground="$primary_background"
+fi
+
+primary_alpha="$(read_alpha_fallback)"
+if ! primary_alpha="$(normalize_alpha "${primary_alpha:-}" 2>/dev/null)"; then
+  primary_alpha="1.0"
+fi
+if ! primary_alpha_hex="$(alpha_to_hex "$primary_alpha" 2>/dev/null)"; then
+  primary_alpha_hex="ff"
+fi
 
 declare -a palette=()
 for idx in $(seq 0 15); do
@@ -144,6 +245,7 @@ for idx in $(seq 0 15); do
       6) var_name="normal_cyan" ;;
       7) var_name="normal_white" ;;
     esac
+    foot_key="regular$idx"
   else
     case "$idx" in
       8) var_name="bright_black" ;;
@@ -155,11 +257,7 @@ for idx in $(seq 0 15); do
       14) var_name="bright_cyan" ;;
       15) var_name="bright_white" ;;
     esac
-  fi
-
-  fallback_key="regular$idx"
-  if (( idx >= 8 )); then
-    fallback_key="bright$((idx-8))"
+    foot_key="bright$((idx-8))"
   fi
 
   value=""
@@ -167,12 +265,16 @@ for idx in $(seq 0 15); do
     value="${!var_name:-}"
   fi
   if ! value="$(normalize_hex "$value" 2>/dev/null)"; then
-    parsed="$(parse_foot_color "$fallback_key")"
-    parsed="${parsed#\#}"
-    if value="$(normalize_hex "$parsed" 2>/dev/null)"; then
-      :
-    else
-      value="$primary_foreground"
+    parsed="$(parse_omarchy_color "color$idx")"
+    if ! value="$(normalize_hex "$parsed" 2>/dev/null)"; then
+      parsed="$(parse_foot_color "$foot_key")"
+      parsed="${parsed#\#}"
+      parsed="${parsed%% *}"
+      if value="$(normalize_hex "$parsed" 2>/dev/null)"; then
+        :
+      else
+        value="$primary_foreground"
+      fi
     fi
   fi
   palette[idx]="$value"
@@ -180,16 +282,20 @@ done
 
 payload=""
 osc_end=$'\e\\'
-payload+=$'\e]10;#'"$primary_foreground""$osc_end"
-payload+=$'\e]11;#'"$primary_background""$osc_end"
-payload+=$'\e]12;#'"$cursor_color""$osc_end"
+payload+=$'\e]10;'"$(format_rgb_spec "$primary_foreground")""$osc_end"
+payload+=$'\e]11;'"$(format_rgb_spec "$primary_background")""$osc_end"
+payload+=$'\e]12;'"$(format_rgb_spec "$cursor_color")""$osc_end"
+payload+=$'\e]17;'"$(format_rgb_spec "$selection_background")""$osc_end"
+payload+=$'\e]19;'"$(format_rgb_spec "$selection_foreground")""$osc_end"
 for idx in $(seq 0 15); do
-  payload+=$'\e]4;'"$idx"';#'"${palette[idx]}""$osc_end"
+  payload+=$'\e]4;'"$idx"';'"$(format_rgb_spec "${palette[idx]}")""$osc_end"
 done
 
 updated=0
+attempted=0
 while IFS= read -r tty; do
   [[ -n "$tty" ]] || continue
+  attempted=$((attempted + 1))
   if [[ ! -w "$tty" ]]; then
     log "cannot write to $tty"
     continue
@@ -202,12 +308,12 @@ while IFS= read -r tty; do
 done < <(collect_foot_ttys)
 
 if (( updated > 0 )); then
-  log "updated $updated foot tty(s)"
+  log "updated $updated/$attempted foot tty(s)"
   if declare -f success >/dev/null 2>&1; then
     success "Foot live colors updated!"
   fi
 else
-  log "no active foot tty to update"
+  log "no foot tty updates applied (attempted=$attempted)"
 fi
 
 exit 0
